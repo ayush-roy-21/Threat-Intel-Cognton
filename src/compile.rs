@@ -1,19 +1,19 @@
 use crate::stix::Bundle;
-use ed25519_dalek::{Signer, SigningKey};
+use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey, Signature};
 use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
 use std::fs;
 use serde::Serialize;
 use std::io::Write;
 
-#[derive(Serialize)]
+#[derive(Serialize, serde::Deserialize)]
 pub struct Manifest {
     pub version: u32,
     pub ipv4_counts: usize,
     pub ipv6_counts: usize,
     pub domain_counts: usize,
     pub sha256_hash: String,
-    pub signature: String,
+    pub signature: String, // of the binary hash concatenated with version counts
 }
 
 pub fn compile_and_sign(bundle: Bundle) -> Result<(), Box<dyn std::error::Error>> {
@@ -31,7 +31,7 @@ pub fn compile_and_sign(bundle: Bundle) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // Binary format: basic bincode of (Vec<String>, Vec<String>, Vec<String>)
+    // Binary format
     let bin_data = bincode::serialize(&( &ipv4s, &ipv6s, &domains ))?;
     
     // Hash
@@ -43,7 +43,14 @@ pub fn compile_and_sign(bundle: Bundle) -> Result<(), Box<dyn std::error::Error>
     // Sign
     let mut csprng = OsRng;
     let signing_key: SigningKey = SigningKey::generate(&mut csprng);
-    let signature = signing_key.sign(&bin_data);
+    let verify_key = signing_key.verifying_key();
+    
+    // Write public key to verify later
+    fs::write("public_key.bin", verify_key.as_bytes())?;
+
+    // Create manifest string before signature to sign both binary and manifest contents
+    let signature_content = format!("v1|ipv4:{}|ipv6:{}|domain:{}|hash:{}", ipv4s.len(), ipv6s.len(), domains.len(), hash_hex);
+    let signature = signing_key.sign(signature_content.as_bytes());
 
     let manifest = Manifest {
         version: 1,
@@ -60,6 +67,37 @@ pub fn compile_and_sign(bundle: Bundle) -> Result<(), Box<dyn std::error::Error>
     let manifest_str = serde_json::to_string_pretty(&manifest)?;
     fs::write("manifest.json", manifest_str)?;
 
+    Ok(())
+}
+
+pub fn verify_and_load() -> Result<(), Box<dyn std::error::Error>> {
+    // Demo loader ensuring tampered files are rejected
+    let bin_data = fs::read("feed.bin")?;
+    let manifest_str = fs::read_to_string("manifest.json")?;
+    let pub_key_bytes = fs::read("public_key.bin")?;
+    
+    let manifest: Manifest = serde_json::from_str(&manifest_str)?;
+    
+    let mut hasher = Sha256::new();
+    hasher.update(&bin_data);
+    let hash_result = hasher.finalize();
+    let hash_hex = hex::encode(hash_result);
+    
+    if hash_hex != manifest.sha256_hash {
+        return Err("Tamper detected: Binary hash mismatch".into());
+    }
+    
+    let signature_content = format!("v1|ipv4:{}|ipv6:{}|domain:{}|hash:{}", 
+        manifest.ipv4_counts, manifest.ipv6_counts, manifest.domain_counts, hash_hex);
+        
+    let verify_key = VerifyingKey::from_bytes(pub_key_bytes.as_slice().try_into()?)?;
+    let sig_bytes = hex::decode(&manifest.signature)?;
+    let signature = Signature::from_bytes(sig_bytes.as_slice().try_into()?);
+    
+    if verify_key.verify(signature_content.as_bytes(), &signature).is_err() {
+        return Err("Tamper detected: Invalid signature".into());
+    }
+    
     Ok(())
 }
 

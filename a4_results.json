@@ -1,0 +1,47 @@
+{
+ "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+ "runs": 3,
+ "rows": [
+  {
+   "family": "ipv4",
+   "name": "DIR-24-8 packed (tbl24 4B + 32B/tbl8 group)",
+   "entries": 1000000,
+   "mem_bytes": 80755552,
+   "bytes_per_entry": 80.76,
+   "build_s": 0.06,
+   "mlps": 130.89,
+   "p50_ns": 7.1,
+   "p99_ns": 26.2,
+   "hits": 1004038,
+   "mismatches": 0,
+   "note": "426459 tbl8 groups"
+  },
+  {
+   "family": "ipv4",
+   "name": "Sorted ranges + 16-bit bucket directory",
+   "entries": 1000000,
+   "mem_bytes": 7395116,
+   "bytes_per_entry": 7.4,
+   "build_s": 0.0,
+   "mlps": 23.86,
+   "p50_ns": 38.7,
+   "p99_ns": 73.0,
+   "hits": 1004038,
+   "mismatches": 0,
+   "note": "891621 ranges, avg 13.6 per bucket"
+  },
+  {
+   "family": "domain",
+   "name": "Cuckoo filter (16-bit fp, 4-way) + exact set",
+   "entries": 5000000,
+   "mem_bytes": 83886080,
+   "bytes_per_entry": 16.78,
+   "build_s": 0.48,
+   "mlps": 10.52,
+   "p50_ns": 91.8,
+   "p99_ns": 169.1,
+   "hits": 10,
+   "mismatches": 0
+  }
+ ]
+}

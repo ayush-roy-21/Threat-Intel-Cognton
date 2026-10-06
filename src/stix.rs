@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Bundle {
+    #[serde(rename = "type")]
     pub type_: String,
     pub id: String,
     pub objects: Vec<Indicator>,
@@ -9,6 +10,7 @@ pub struct Bundle {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Indicator {
+    #[serde(rename = "type")]
     pub type_: String,
     pub spec_version: String,
     pub id: String,

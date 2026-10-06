@@ -53,17 +53,22 @@ pub fn extract_iocs_from_html(html: &str, source: String) -> Vec<RawIoc> {
     let cleaned_for_regex = html.replace(" ", "");
     let defang_re = Regex::new(r"\[\.\]|\(\.\)").unwrap();
     let cleaned_for_extraction = defang_re.replace_all(&cleaned_for_regex, ".");
+    let url_defang = Regex::new(r"\[:\]").unwrap();
+    let mut cleaned_for_extraction = url_defang.replace_all(&cleaned_for_extraction, ":").to_string();
+    cleaned_for_extraction = cleaned_for_extraction.replace("hxxp", "http");
 
-    let ipv4_re = Regex::new(r"(?:\b|\s)(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:\b|\s|/|\z)").unwrap();
-    let ipv6_re = Regex::new(r"(?i)(?:(?:[0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(?:ffff(?::0{1,4}){0,1}:){0,1}(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])|(?:[0-9a-fA-F]{1,4}:){1,4}:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9]))").unwrap();
+    let ipv4_re = Regex::new(r"(?:\b|\s)((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:/[0-9]{1,2})?)(?:\b|\s|\z)").unwrap();
+    let ipv6_re = Regex::new(r"(?i)\b([0-9a-fA-F:]+:[0-9a-fA-F:]+(?:/[0-9]{1,3})?)\b").unwrap(); // simplified but prevents truncation
     let domain_re = Regex::new(r"(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:com|org|net|xyz|shop|in)\b").unwrap();
+    let url_re = Regex::new(r"(?i)\bhttps?://[^\s<>]+").unwrap();
     let sha256_re = Regex::new(r"(?i)\b[A-Fa-f0-9]{64}\b").unwrap();
 
     let now = Utc::now();
     let until = now + Duration::days(30);
 
-    for mat in ipv4_re.find_iter(&cleaned_for_extraction) {
-        let val = mat.as_str().trim().trim_end_matches('/').to_string();
+    for mat in ipv4_re.captures_iter(&cleaned_for_extraction) {
+        if let Some(val) = mat.get(1) {
+            let val = val.as_str().trim().to_string();
         if val != "8.8.8.8" && val != "1.1.1.1" && val != "10.0.0.1" { // filter standard examples if needed, but we rely on B3 guard
             results.push(RawIoc {
                 value: val,
@@ -85,14 +90,28 @@ pub fn extract_iocs_from_html(html: &str, source: String) -> Vec<RawIoc> {
         }
     }
 
-    for mat in ipv6_re.find_iter(&cleaned_for_extraction) {
+    for mat in ipv6_re.captures_iter(&cleaned_for_extraction) {
+        if let Some(val) = mat.get(1) {
+            results.push(RawIoc {
+                value: val.as_str().trim().to_string(),
+                ioc_type: IocType::Ipv6,
+                source: source.clone(),
+                first_seen: now,
+                valid_until: until,
+                confidence: 90.0,
+            });
+        }
+    }
+
+    for mat in url_re.find_iter(&cleaned_for_extraction) {
+        let val = mat.as_str().trim().to_lowercase();
         results.push(RawIoc {
-            value: mat.as_str().trim().to_string(),
-            ioc_type: IocType::Ipv6,
+            value: val,
+            ioc_type: IocType::Url,
             source: source.clone(),
             first_seen: now,
-            valid_until: until,
-            confidence: 90.0,
+            valid_until: now + Duration::days(30),
+            confidence: 85.0,
         });
     }
 
