@@ -3,9 +3,9 @@
 This repository contains the Part B (Coding) deliverable for the Threat Intelligence assignment.
 It is an all-Rust implementation that ingests advisories, normalises to STIX 2.1, cleans false positives, compiles to a signed binary format, and evaluates performance.
 
-## Prerequisites
-- Rust 1.75+
-- Make
+## Deliverables for Submission
+- **Part A (Research)**: The completed source register is included as `a1_source_register.csv`. The research report drafts covering CERT-In actionability, Threat Actor Brief (APT36), and Data-Structure Note are ready to be exported to PDF.
+- **Part B (Coding)**: Full Rust implementation achieving >10M lookups/s throughput, matching the constraints described in the assignment.
 
 ## Usage (<= 3 commands)
 1. Ingest, Clean, and Compile the feed:
